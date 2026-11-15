@@ -1,11 +1,12 @@
 
 package com.jarvis.ai
 
+import android.app.Activity
 import android.os.Bundle
+import android.view.Gravity
 import android.widget.TextView
-import androidx.activity.ComponentActivity
 
-class MainActivity : ComponentActivity() {
+class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -13,7 +14,7 @@ class MainActivity : ComponentActivity() {
         val textView = TextView(this)
         textView.text = "JARVIS IS ONLINE"
         textView.textSize = 26f
-        textView.gravity = android.view.Gravity.CENTER
+        textView.gravity = Gravity.CENTER
 
         setContentView(textView)
     }
