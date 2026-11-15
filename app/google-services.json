@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "816548425402",
+    "project_id": "jarvisai-2ffff",
+    "storage_bucket": "jarvisai-2ffff.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:816548425402:android:e0d2f94ff7d6f6e5179c83",
+        "android_client_info": {
+          "package_name": "com.jarvis.ai"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBREJh1Jur5ucx03WCnfeDZNppGvazTwzk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
