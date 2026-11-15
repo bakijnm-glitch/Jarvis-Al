@@ -1,3 +1,4 @@
+
 package com.jarvis.ai
 
 import android.Manifest
@@ -8,14 +9,19 @@ import android.os.Bundle
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
+import android.speech.tts.TextToSpeech
 import android.view.Gravity
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
+import java.util.Locale
 
 class MainActivity : Activity() {
 
     private var speechRecognizer: SpeechRecognizer? = null
+    private var textToSpeech: TextToSpeech? = null
+    private var ttsReady = false
+
     private lateinit var statusText: TextView
     private lateinit var resultText: TextView
 
@@ -43,7 +49,7 @@ class MainActivity : Activity() {
         }
 
         resultText = TextView(this).apply {
-            text = "Komutun burada görünecek."
+            text = "Komutunu bekliyorum."
             textSize = 18f
             gravity = Gravity.CENTER
         }
@@ -61,6 +67,25 @@ class MainActivity : Activity() {
         layout.addView(microphoneButton)
 
         setContentView(layout)
+
+        textToSpeech = TextToSpeech(this) { status ->
+            if (status == TextToSpeech.SUCCESS) {
+                val languageResult =
+                    textToSpeech?.setLanguage(Locale("tr", "TR"))
+
+                ttsReady =
+                    languageResult != TextToSpeech.LANG_MISSING_DATA &&
+                    languageResult != TextToSpeech.LANG_NOT_SUPPORTED &&
+                    languageResult != null &&
+                    languageResult >= TextToSpeech.LANG_AVAILABLE
+
+                if (!ttsReady) {
+                    statusText.text = "Türkçe ses paketi bulunamadı."
+                }
+            } else {
+                statusText.text = "Ses motoru başlatılamadı."
+            }
+        }
 
         if (!SpeechRecognizer.isRecognitionAvailable(this)) {
             statusText.text = "Konuşma tanıma servisi bulunamadı."
@@ -98,10 +123,27 @@ class MainActivity : Activity() {
                     SpeechRecognizer.RESULTS_RECOGNITION
                 )
 
-                resultText.text = matches?.firstOrNull()
-                    ?: "Konuşma anlaşılamadı."
+                val spokenText = matches?.firstOrNull()
 
-                statusText.text = "Dinleme tamamlandı."
+                if (spokenText != null) {
+                    resultText.text = spokenText
+
+                    val reply = "Seni duydum. $spokenText"
+                    statusText.text = "Cevap veriyorum..."
+
+                    if (ttsReady) {
+                        textToSpeech?.speak(
+                            reply,
+                            TextToSpeech.QUEUE_FLUSH,
+                            null,
+                            "jarvis_reply"
+                        )
+                    } else {
+                        statusText.text = "Türkçe ses motoru hazır değil."
+                    }
+                } else {
+                    statusText.text = "Konuşma anlaşılamadı."
+                }
             }
 
             override fun onPartialResults(partialResults: Bundle?) {}
@@ -161,6 +203,11 @@ class MainActivity : Activity() {
     override fun onDestroy() {
         speechRecognizer?.destroy()
         speechRecognizer = null
+
+        textToSpeech?.stop()
+        textToSpeech?.shutdown()
+        textToSpeech = null
+
         super.onDestroy()
     }
 }
