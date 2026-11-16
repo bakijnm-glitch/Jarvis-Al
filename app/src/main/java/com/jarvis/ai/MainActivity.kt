@@ -14,6 +14,17 @@ import android.view.Gravity
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
+import com.google.firebase.Firebase
+import com.google.firebase.ai.ai
+import com.google.firebase.ai.type.GenerativeBackend
+import com.google.firebase.appcheck.appCheck
+import com.google.firebase.appcheck.debug.DebugAppCheckProviderFactory
+import com.google.firebase.initialize
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import java.util.Locale
 
 class MainActivity : Activity() {
@@ -27,8 +38,31 @@ class MainActivity : Activity() {
 
     private val microphoneRequestCode = 100
 
+    private val aiScope =
+        CoroutineScope(SupervisorJob() + Dispatchers.Main)
+
+    private val model by lazy {
+        Firebase.ai(
+            backend = GenerativeBackend.googleAI()
+        ).generativeModel("gemini-3.8-flash")
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        try {
+            Firebase.initialize(context = this)
+
+            Firebase.appCheck.installAppCheckProviderFactory(
+                DebugAppCheckProviderFactory.getInstance()
+            )
+        } catch (e: Exception) {
+            android.util.Log.e(
+                "Jarvis",
+                "Firebase başlatma hatası",
+                e
+            )
+        }
 
         val layout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -80,76 +114,117 @@ class MainActivity : Activity() {
                     languageResult >= TextToSpeech.LANG_AVAILABLE
 
                 if (!ttsReady) {
-                    statusText.text = "Türkçe ses paketi bulunamadı."
+                    statusText.text =
+                        "Türkçe ses paketi bulunamadı."
                 }
             } else {
-                statusText.text = "Ses motoru başlatılamadı."
+                statusText.text =
+                    "Ses motoru başlatılamadı."
             }
         }
 
         if (!SpeechRecognizer.isRecognitionAvailable(this)) {
-            statusText.text = "Konuşma tanıma servisi bulunamadı."
+            statusText.text =
+                "Konuşma tanıma servisi bulunamadı."
         } else {
-            speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this)
+            speechRecognizer =
+                SpeechRecognizer.createSpeechRecognizer(this)
+
             setupSpeechRecognizer()
         }
     }
 
     private fun setupSpeechRecognizer() {
-        speechRecognizer?.setRecognitionListener(object : RecognitionListener {
+        speechRecognizer?.setRecognitionListener(
+            object : RecognitionListener {
 
-            override fun onReadyForSpeech(params: Bundle?) {
-                statusText.text = "Seni dinliyorum..."
+                override fun onReadyForSpeech(params: Bundle?) {
+                    statusText.text = "Seni dinliyorum..."
+                }
+
+                override fun onBeginningOfSpeech() {
+                    statusText.text = "Konuşmanı algılıyorum..."
+                }
+
+                override fun onRmsChanged(rmsdB: Float) {}
+
+                override fun onBufferReceived(buffer: ByteArray?) {}
+
+                override fun onEndOfSpeech() {
+                    statusText.text = "Gemini düşünüyor..."
+                }
+
+                override fun onError(error: Int) {
+                    statusText.text =
+                        "Ses algılanamadı. Tekrar dene. ($error)"
+                }
+
+                override fun onResults(results: Bundle?) {
+                    val matches = results?.getStringArrayList(
+                        SpeechRecognizer.RESULTS_RECOGNITION
+                    )
+
+                    val spokenText = matches?.firstOrNull()
+
+                    if (spokenText != null) {
+                        resultText.text = spokenText
+                        askGemini(spokenText)
+                    } else {
+                        statusText.text =
+                            "Konuşma anlaşılamadı."
+                    }
+                }
+
+                override fun onPartialResults(
+                    partialResults: Bundle?
+                ) {}
+
+                override fun onEvent(
+                    eventType: Int,
+                    params: Bundle?
+                ) {}
             }
+        )
+    }
 
-            override fun onBeginningOfSpeech() {
-                statusText.text = "Konuşmanı algılıyorum..."
-            }
+    private fun askGemini(question: String) {
+        statusText.text = "Gemini düşünüyor..."
 
-            override fun onRmsChanged(rmsdB: Float) {}
-
-            override fun onBufferReceived(buffer: ByteArray?) {}
-
-            override fun onEndOfSpeech() {
-                statusText.text = "İşleniyor..."
-            }
-
-            override fun onError(error: Int) {
-                statusText.text = "Ses algılanamadı. Tekrar dene. ($error)"
-            }
-
-            override fun onResults(results: Bundle?) {
-                val matches = results?.getStringArrayList(
-                    SpeechRecognizer.RESULTS_RECOGNITION
+        aiScope.launch {
+            try {
+                val response = model.generateContent(
+                    "Sen Jarvis adlı Türkçe konuşan bir " +
+                    "kişisel asistansın. Açık, doğal ve " +
+                    "yardımcı cevaplar ver. Kullanıcının " +
+                    "sorusu: $question"
                 )
 
-                val spokenText = matches?.firstOrNull()
+                val reply = response.text?.trim()
+                    ?.takeIf { it.isNotEmpty() }
+                    ?: "Bu soruya şu anda cevap üretemedim."
 
-                if (spokenText != null) {
-                    resultText.text = spokenText
+                resultText.text = reply
+                statusText.text = "Cevap hazır."
 
-                    val reply = "Seni duydum. $spokenText"
-                    statusText.text = "Cevap veriyorum..."
-
-                    if (ttsReady) {
-                        textToSpeech?.speak(
-                            reply,
-                            TextToSpeech.QUEUE_FLUSH,
-                            null,
-                            "jarvis_reply"
-                        )
-                    } else {
-                        statusText.text = "Türkçe ses motoru hazır değil."
-                    }
-                } else {
-                    statusText.text = "Konuşma anlaşılamadı."
+                if (ttsReady) {
+                    textToSpeech?.speak(
+                        reply,
+                        TextToSpeech.QUEUE_FLUSH,
+                        null,
+                        "jarvis_reply"
+                    )
                 }
+            } catch (e: Exception) {
+                statusText.text =
+                    "Gemini bağlantısında hata oluştu."
+
+                android.util.Log.e(
+                    "Jarvis",
+                    "Gemini hatası",
+                    e
+                )
             }
-
-            override fun onPartialResults(partialResults: Bundle?) {}
-
-            override fun onEvent(eventType: Int, params: Bundle?) {}
-        })
+        }
     }
 
     private fun startListening() {
@@ -163,13 +238,21 @@ class MainActivity : Activity() {
             return
         }
 
-        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+        val intent = Intent(
+            RecognizerIntent.ACTION_RECOGNIZE_SPEECH
+        ).apply {
             putExtra(
                 RecognizerIntent.EXTRA_LANGUAGE_MODEL,
                 RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
             )
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "tr-TR")
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "tr-TR")
+            putExtra(
+                RecognizerIntent.EXTRA_LANGUAGE,
+                "tr-TR"
+            )
+            putExtra(
+                RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE,
+                "tr-TR"
+            )
         }
 
         try {
@@ -201,6 +284,8 @@ class MainActivity : Activity() {
     }
 
     override fun onDestroy() {
+        aiScope.cancel()
+
         speechRecognizer?.destroy()
         speechRecognizer = null
 
