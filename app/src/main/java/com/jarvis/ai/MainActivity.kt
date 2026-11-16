@@ -17,6 +17,8 @@ import android.widget.TextView
 import com.google.firebase.Firebase
 import com.google.firebase.ai.ai
 import com.google.firebase.ai.type.GenerativeBackend
+import com.google.firebase.appCheck
+import com.google.firebase.appcheck.debug.DebugAppCheckProviderFactory
 import com.google.firebase.initialize
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -50,6 +52,10 @@ class MainActivity : Activity() {
 
         try {
             Firebase.initialize(context = this)
+
+            Firebase.appCheck.installAppCheckProviderFactory(
+                DebugAppCheckProviderFactory.getInstance()
+            )
         } catch (e: Exception) {
             android.util.Log.e(
                 "Jarvis",
@@ -102,8 +108,6 @@ class MainActivity : Activity() {
                     textToSpeech?.setLanguage(Locale("tr", "TR"))
 
                 ttsReady =
-                    languageResult != TextToSpeech.LANG_MISSING_DATA &&
-                    languageResult != TextToSpeech.LANG_NOT_SUPPORTED &&
                     languageResult != null &&
                     languageResult >= TextToSpeech.LANG_AVAILABLE
 
@@ -112,8 +116,7 @@ class MainActivity : Activity() {
                         "Türkçe ses paketi bulunamadı."
                 }
             } else {
-                statusText.text =
-                    "Ses motoru başlatılamadı."
+                statusText.text = "Ses motoru başlatılamadı."
             }
         }
 
@@ -164,19 +167,13 @@ class MainActivity : Activity() {
                         resultText.text = spokenText
                         askGemini(spokenText)
                     } else {
-                        statusText.text =
-                            "Konuşma anlaşılamadı."
+                        statusText.text = "Konuşma anlaşılamadı."
                     }
                 }
 
-                override fun onPartialResults(
-                    partialResults: Bundle?
-                ) {}
+                override fun onPartialResults(partialResults: Bundle?) {}
 
-                override fun onEvent(
-                    eventType: Int,
-                    params: Bundle?
-                ) {}
+                override fun onEvent(eventType: Int, params: Bundle?) {}
             }
         )
     }
@@ -239,14 +236,8 @@ class MainActivity : Activity() {
                 RecognizerIntent.EXTRA_LANGUAGE_MODEL,
                 RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
             )
-            putExtra(
-                RecognizerIntent.EXTRA_LANGUAGE,
-                "tr-TR"
-            )
-            putExtra(
-                RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE,
-                "tr-TR"
-            )
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "tr-TR")
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "tr-TR")
         }
 
         try {
@@ -279,14 +270,11 @@ class MainActivity : Activity() {
 
     override fun onDestroy() {
         aiScope.cancel()
-
         speechRecognizer?.destroy()
         speechRecognizer = null
-
         textToSpeech?.stop()
         textToSpeech?.shutdown()
         textToSpeech = null
-
         super.onDestroy()
     }
 }
