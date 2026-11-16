@@ -17,8 +17,6 @@ import android.widget.TextView
 import com.google.firebase.Firebase
 import com.google.firebase.ai.ai
 import com.google.firebase.ai.type.GenerativeBackend
-import com.google.firebase.appcheck.appCheck
-import com.google.firebase.appcheck.debug.DebugAppCheckProviderFactory
 import com.google.firebase.initialize
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -52,10 +50,6 @@ class MainActivity : Activity() {
 
         try {
             Firebase.initialize(context = this)
-
-            Firebase.appCheck.installAppCheckProviderFactory(
-                DebugAppCheckProviderFactory.getInstance()
-            )
         } catch (e: Exception) {
             android.util.Log.e(
                 "Jarvis",
